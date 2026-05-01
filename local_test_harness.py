@@ -17,9 +17,9 @@ def run_local_test():
 	mocked_s3 = Mock()
 	mocked_s3.get_object.return_value = {"Body": io.BytesIO(fake_payload)}
 
-	modelRestService._CACHED_MODEL = None
+	lambda_function._CACHED_MODEL = None
 	with patch("modelRestService.boto3.client", return_value=mocked_s3):
-		result = modelRestService.lambda_handler({}, None)
+		result = lambda_function.lambda_handler({}, None)
 
 	print(result)
 
