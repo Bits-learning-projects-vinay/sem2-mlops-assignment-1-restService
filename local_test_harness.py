@@ -3,7 +3,7 @@ import os
 import pickle
 from unittest.mock import Mock, patch
 
-import modelRestService
+import lambda_function
 
 
 def run_local_test():

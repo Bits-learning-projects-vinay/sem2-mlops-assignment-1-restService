@@ -3,7 +3,6 @@ import os
 import pickle
 
 import boto3
-import pandas as pd
 from botocore.exceptions import BotoCoreError, ClientError
 
 _CACHED_MODEL = None
@@ -42,9 +41,7 @@ def get_model(s3_client=None):
 
 
 def normalize_features(features):
-	"""Accept list-of-dicts (DataFrame style) or list-of-lists input."""
-	if isinstance(features, list) and features and isinstance(features[0], dict):
-		return pd.DataFrame(features)
+
 	return features
 
 
