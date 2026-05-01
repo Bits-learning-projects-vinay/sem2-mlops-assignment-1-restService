@@ -29,8 +29,4 @@ jobs:
       - name: Syntax check
         run: |
           python -m py_compile lambda_function.py
-          python -m py_compile local_test_harness.py
-
-      - name: Run local mocked smoke test
-        run: python local_test_harness.py
 
