@@ -16,6 +16,7 @@ class HeartDiseaseCleaner(BaseEstimator, TransformerMixin):
     FIX: The __init__ must only assign arguments. Modification (like list())
     must happen in transform to prevent RuntimeError during cross-validation.
     """
+
     def __init__(self, categorical_features=None):
         self.categorical_features = categorical_features
 
@@ -27,7 +28,7 @@ class HeartDiseaseCleaner(BaseEstimator, TransformerMixin):
             X = pd.DataFrame(X)
 
         cleaned = X.copy()
-        cleaned = cleaned.replace('?', pd.NA)
+        cleaned = cleaned.replace("?", pd.NA)
 
         # Handle feature list conversion here, not in __init__
         cat_cols = list(self.categorical_features) if self.categorical_features else []
@@ -39,14 +40,23 @@ class HeartDiseaseCleaner(BaseEstimator, TransformerMixin):
                 cleaned[col] = cleaned[col].fillna(mode.iloc[0])
 
         # Convert to numeric and handle any remaining NaNs with median
-        cleaned = cleaned.apply(pd.to_numeric, errors='coerce')
+        cleaned = cleaned.apply(pd.to_numeric, errors="coerce")
         cleaned = cleaned.fillna(cleaned.median(numeric_only=True))
         return cleaned
 
 
 class DataPreProcessingAndFeatureEngg:
-    NUMERIC_FEATURES = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak']
-    CATEGORICAL_FEATURES = ['sex', 'cp', 'fbs', 'restecg', 'exang', 'slope', 'ca', 'thal']
+    NUMERIC_FEATURES = ["age", "trestbps", "chol", "thalach", "oldpeak"]
+    CATEGORICAL_FEATURES = [
+        "sex",
+        "cp",
+        "fbs",
+        "restecg",
+        "exang",
+        "slope",
+        "ca",
+        "thal",
+    ]
 
     def __init__(self, dataset_id: int = 45):
         loader = DataSetLoader(dataset_id=dataset_id)
@@ -66,7 +76,7 @@ class DataPreProcessingAndFeatureEngg:
         cleaned_targets = targets_df.copy()
         target_col = cleaned_targets.columns[0]
         cleaned_targets[target_col] = (
-                pd.to_numeric(cleaned_targets[target_col], errors='coerce').fillna(0) > 0
+            pd.to_numeric(cleaned_targets[target_col], errors="coerce").fillna(0) > 0
         ).astype(int)
         return cleaned_targets
 
@@ -94,13 +104,15 @@ class DataPreProcessingAndFeatureEngg:
         axes[0].set_title("Target Distribution (0=Healthy, 1=Disease)")
 
         # 2. Age Distribution
-        if 'age' in df.columns:
-            sns.histplot(data=df, x='age', hue=target_name, kde=True, ax=axes[1], element="step")
+        if "age" in df.columns:
+            sns.histplot(
+                data=df, x="age", hue=target_name, kde=True, ax=axes[1], element="step"
+            )
             axes[1].set_title("Age Distribution by Risk")
 
         # 3. Correlation
         corr = df.corr(numeric_only=True)
-        sns.heatmap(corr, annot=False, cmap='RdBu_r', center=0, ax=axes[2])
+        sns.heatmap(corr, annot=False, cmap="RdBu_r", center=0, ax=axes[2])
         axes[2].set_title("Feature Correlation Heatmap")
 
         plt.tight_layout()
@@ -109,23 +121,35 @@ class DataPreProcessingAndFeatureEngg:
     def build_preprocessing_pipeline(self):
         """Creates an automated pipeline for numeric scaling and categorical encoding."""
         # Use simple presence checks to avoid errors if some columns are missing
-        num_cols = [c for c in self.NUMERIC_FEATURES if c in self.features_before_clean.columns]
-        cat_cols = [c for c in self.CATEGORICAL_FEATURES if c in self.features_before_clean.columns]
+        num_cols = [
+            c for c in self.NUMERIC_FEATURES if c in self.features_before_clean.columns
+        ]
+        cat_cols = [
+            c
+            for c in self.CATEGORICAL_FEATURES
+            if c in self.features_before_clean.columns
+        ]
 
-        numeric_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='mean')),
-            ('scaler', StandardScaler())
-        ])
+        numeric_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="mean")),
+                ("scaler", StandardScaler()),
+            ]
+        )
 
-        categorical_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='most_frequent')),
-            ('onehot', OneHotEncoder(handle_unknown='ignore', sparse_output=False))
-        ])
+        categorical_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+            ]
+        )
 
-        preprocessor = ColumnTransformer(transformers=[
-            ('num', numeric_transformer, num_cols),
-            ('cat', categorical_transformer, cat_cols)
-        ])
+        preprocessor = ColumnTransformer(
+            transformers=[
+                ("num", numeric_transformer, num_cols),
+                ("cat", categorical_transformer, cat_cols),
+            ]
+        )
         return preprocessor
 
     def build_reproducible_preprocessing_pipeline(self):
@@ -134,17 +158,22 @@ class DataPreProcessingAndFeatureEngg:
         This is what ensures Task 4 'Reproducibility' requirements.
         """
         base_preprocessor = self.build_preprocessing_pipeline()
-        return Pipeline(steps=[
-            ('cleaner', HeartDiseaseCleaner(categorical_features=self.CATEGORICAL_FEATURES)),
-            ('preprocessor', base_preprocessor),
-        ])
+        return Pipeline(
+            steps=[
+                (
+                    "cleaner",
+                    HeartDiseaseCleaner(categorical_features=self.CATEGORICAL_FEATURES),
+                ),
+                ("preprocessor", base_preprocessor),
+            ]
+        )
 
     def get_processed_data(self):
         """Convenience method for main execution."""
         return self.clean_data()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Test script
     dp = DataPreProcessingAndFeatureEngg()
     X, y = dp.get_processed_data()
