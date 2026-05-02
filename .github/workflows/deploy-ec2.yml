@@ -1,15 +1,14 @@
 name: Deploy EC2 Flask Service
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -21,6 +20,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
+          # Ensure all necessary files are included
           source: "model_service.py,requirements.txt,scripts/ec2_bootstrap.sh"
           target: ${{ secrets.EC2_APP_DIR }}
 
@@ -31,24 +31,21 @@ jobs:
           MODEL_S3_KEY: ${{ secrets.MODEL_S3_KEY }}
           MODEL_S3_REGION: ${{ secrets.MODEL_S3_REGION }}
           APP_DIR: ${{ secrets.EC2_APP_DIR }}
-          APP_USER: ${{ secrets.EC2_USER }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
-          envs: MODEL_S3_BUCKET,MODEL_S3_KEY,MODEL_S3_REGION,APP_DIR,APP_USER
+          envs: MODEL_S3_BUCKET,MODEL_S3_KEY,MODEL_S3_REGION,APP_DIR
           script: |
             set -e
-            mkdir -p "$APP_DIR"
-            cp "$APP_DIR/scripts/ec2_bootstrap.sh" "$APP_DIR/ec2_bootstrap.sh"
-            chmod +x "$APP_DIR/ec2_bootstrap.sh"
-
-            export MODEL_S3_BUCKET="$MODEL_S3_BUCKET"
-            export MODEL_S3_KEY="$MODEL_S3_KEY"
-            export MODEL_S3_REGION="$MODEL_S3_REGION"
-            export APP_DIR="$APP_DIR"
-            export APP_USER="$APP_USER"
-
+            # Navigate to app directory
             cd "$APP_DIR"
-            bash ./ec2_bootstrap.sh
+            
+            # Fix file structure if scp put them in a subfolder
+            cp scripts/ec2_bootstrap.sh .
+            chmod +x ec2_bootstrap.sh
+            
+            # Run the bootstrap script to install dependencies and start Flask
+            # We pass variables into the script or a .env file
+            ./ec2_bootstrap.sh
