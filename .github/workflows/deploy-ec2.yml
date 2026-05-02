@@ -83,7 +83,7 @@ jobs:
           port: ${{ secrets.EC2_PORT }}
           source: "model_service.py,requirements.txt,Dockerfile"
           target: ${{ secrets.EC2_APP_DIR }}
-
+          debug: true
       - name: Build and Run Docker Container on EC2
         # Updated to v1.2.4 for latest security and runtime support
         uses: appleboy/ssh-action@v1.2.4
