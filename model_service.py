@@ -66,7 +66,7 @@ def _extract_probability(proba):
     if hasattr(proba, "shape") and len(proba.shape) > 1:
         return proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
 
-    return proba
+    return "Heart Disease Detected" if proba[0] == 1 else "No Heart Disease Detected"
 
 
 def run_prediction(features, model=None):
@@ -75,6 +75,7 @@ def run_prediction(features, model=None):
     normalized = normalize_features(features)
 
     prediction = active_model.predict(normalized)
+
     body = {"prediction": _to_json_safe(prediction)}
 
     if hasattr(active_model, "predict_proba"):
