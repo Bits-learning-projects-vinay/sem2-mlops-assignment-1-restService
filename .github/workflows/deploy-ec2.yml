@@ -1,0 +1,54 @@
+name: Deploy EC2 Flask Service
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Copy app files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          source: "model_service.py,requirements.txt,scripts/ec2_bootstrap.sh"
+          target: ${{ secrets.EC2_APP_DIR }}
+
+      - name: Deploy and restart service on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
+          MODEL_S3_KEY: ${{ secrets.MODEL_S3_KEY }}
+          MODEL_S3_REGION: ${{ secrets.MODEL_S3_REGION }}
+          APP_DIR: ${{ secrets.EC2_APP_DIR }}
+          APP_USER: ${{ secrets.EC2_USER }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          envs: MODEL_S3_BUCKET,MODEL_S3_KEY,MODEL_S3_REGION,APP_DIR,APP_USER
+          script: |
+            set -e
+            mkdir -p "$APP_DIR"
+            cp "$APP_DIR/scripts/ec2_bootstrap.sh" "$APP_DIR/ec2_bootstrap.sh"
+            chmod +x "$APP_DIR/ec2_bootstrap.sh"
+
+            export MODEL_S3_BUCKET="$MODEL_S3_BUCKET"
+            export MODEL_S3_KEY="$MODEL_S3_KEY"
+            export MODEL_S3_REGION="$MODEL_S3_REGION"
+            export APP_DIR="$APP_DIR"
+            export APP_USER="$APP_USER"
+
+            cd "$APP_DIR"
+            bash ./ec2_bootstrap.sh
