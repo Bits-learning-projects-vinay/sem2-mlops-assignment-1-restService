@@ -59,7 +59,9 @@ class ModelServiceUnitTests(unittest.TestCase):
         )
 
         self.assertEqual(expected_model, actual)
-        s3_client.get_object.assert_called_once_with(Bucket="demo-bucket", Key="models/demo.pkl")
+        s3_client.get_object.assert_called_once_with(
+            Bucket="demo-bucket", Key="models/demo.pkl"
+        )
 
     def test_get_model_raises_when_required_env_missing(self):
         os.environ.pop("MODEL_S3_BUCKET", None)
@@ -74,7 +76,8 @@ class ModelServiceUnitTests(unittest.TestCase):
         os.environ["MODEL_S3_REGION"] = "ap-south-1"
 
         loaded_model = object()
-        with patch("model_service.load_model_from_s3", return_value=loaded_model) as mocked_loader:
+        patcher = patch("model_service.load_model_from_s3", return_value=loaded_model)
+        with patcher as mocked_loader:
             first = model_service.get_model()
             second = model_service.get_model()
 
@@ -165,4 +168,3 @@ class FlaskRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
