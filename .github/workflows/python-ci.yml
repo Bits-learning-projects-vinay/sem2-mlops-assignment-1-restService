@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
 
-# Setting this at the top level ensures all JS actions use Node.js 24 immediately
+# Keep this to opt-in to Node 24 for all JS actions
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -15,13 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        # v4 is currently the standard; monitor for v5 releases
-        # which will explicitly target Node 24
-        uses: actions/checkout@v4
+        # v4 is triggering the warning; update to v6 for Node 24 support
+        uses: actions/checkout@v6
 
       - name: Copy files to EC2
-        # Updated from v0.1.7 to v0.1.7 (latest minor)
-        # or check community updates for Node 24 support
+        # This is the Docker action shown in your logs
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -32,7 +30,7 @@ jobs:
           target: ${{ secrets.EC2_APP_DIR }}
 
       - name: Build and Run Docker Container on EC2
-        # Updated from v1.0.3 to v1.2.0 (Check for latest releases)
+        # Version 1.2.0 is recommended for better compatibility
         uses: appleboy/ssh-action@v1.2.0
         env:
           MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
