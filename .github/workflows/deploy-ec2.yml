@@ -10,7 +10,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Early opt-in to Node.js 24 to ensure compatibility across all JS actions
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -19,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        # Updated to v6 to support Node 24 natively
         uses: actions/checkout@v6
 
       - name: Set up Python
@@ -37,14 +35,12 @@ jobs:
 
       - name: Run Flake8 (Code Quality Check)
         run: |
-          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings (Max line length 120 to match Black)
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
 
   test:
     name: Run Unit Tests
-    needs: lint # Only run tests if linting passes
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -59,15 +55,17 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pandas boto3 flask
 
       - name: Run tests
-        run: pytest tests/
+        run: |
+          # python -m ensures the current directory is in the PYTHONPATH
+          python -m pytest tests/
 
   deploy:
     name: Deploy to EC2
-    needs: test # Only deploy if tests pass
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -84,8 +82,8 @@ jobs:
           source: "model_service.py,requirements.txt,Dockerfile"
           target: ${{ secrets.EC2_APP_DIR }}
           debug: true
+
       - name: Build and Run Docker Container on EC2
-        # Updated to v1.2.4 for latest security and runtime support
         uses: appleboy/ssh-action@v1.2.4
         env:
           MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
@@ -102,12 +100,22 @@ jobs:
             set -e
             cd "$APP_DIR"
             
+            # Smart Docker Installation (Handles Ubuntu/Debian and Amazon Linux/RHEL)
             if ! [ -x "$(command -v docker)" ]; then
-              sudo yum update -y && sudo yum install -y docker
-              sudo service docker start
+              echo "Docker not found, installing..."
+              if [ -x "$(command -v apt-get)" ]; then
+                sudo apt-get update -y && sudo apt-get install -y docker.io
+                sudo systemctl start docker
+                sudo systemctl enable docker
+              elif [ -x "$(command -v yum)" ]; then
+                sudo yum update -y && sudo yum install -y docker
+                sudo service docker start
+              fi
               sudo usermod -a -G docker ${{ secrets.EC2_USER }}
+              echo "Docker installed. Note: You may need to run 'sudo chmod 666 /var/run/docker.sock' manually once."
             fi
 
+            # Deployment Steps
             docker stop flask-model-service || true
             docker rm flask-model-service || true
             docker build -t flask-model-service .
