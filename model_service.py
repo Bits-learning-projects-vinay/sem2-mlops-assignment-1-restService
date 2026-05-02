@@ -102,9 +102,10 @@ def create_app():
         features = payload.get("features")
 
         if features is None:
-            return jsonify({
-                "error": "Request JSON must include a 'features' field."
-            }), 400
+            return (
+                jsonify({"error": "Request JSON must include a 'features' field."}),
+                400,
+            )
 
         try:
             return jsonify(run_prediction(features))
