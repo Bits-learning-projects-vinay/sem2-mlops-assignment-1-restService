@@ -79,7 +79,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
           # CRITICAL: Added dataPreProcessingAndFeatureEngg.py to the source list
-          source: "model_service.py,requirements.txt,Dockerfile,dataPreProcessingAndFeatureEngg.py"
+          source: "model_service.py,requirements.txt,Dockerfile,dataPreProcessingAndFeatureEngg.py,dataSetLoad.py"
           target: ${{ secrets.EC2_APP_DIR }}
           debug: true
 
