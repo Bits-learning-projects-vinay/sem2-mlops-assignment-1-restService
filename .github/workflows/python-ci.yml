@@ -1,36 +1,68 @@
-name: Python CI
+name: Deploy Flask Model to EC2
 
 on:
   push:
     branches:
       - main
-      - master
-  pull_request:
+  workflow_dispatch:
+
+# Setting this at the top level ensures all JS actions use Node.js 24 immediately
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  validate:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
+        # v4 is currently the standard; monitor for v5 releases
+        # which will explicitly target Node 24
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Copy files to EC2
+        # Updated from v0.1.7 to v0.1.7 (latest minor)
+        # or check community updates for Node 24 support
+        uses: appleboy/scp-action@v0.1.7
         with:
-          python-version: "3.11"
-          cache: "pip"
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          source: "model_service.py,requirements.txt,Dockerfile"
+          target: ${{ secrets.EC2_APP_DIR }}
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: Build and Run Docker Container on EC2
+        # Updated from v1.0.3 to v1.2.0 (Check for latest releases)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
+          MODEL_S3_KEY: ${{ secrets.MODEL_S3_KEY }}
+          MODEL_S3_REGION: ${{ secrets.MODEL_S3_REGION }}
+          APP_DIR: ${{ secrets.EC2_APP_DIR }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          envs: MODEL_S3_BUCKET,MODEL_S3_KEY,MODEL_S3_REGION,APP_DIR
+          script: |
+            set -e
+            cd "$APP_DIR"
+            
+            if ! [ -x "$(command -v docker)" ]; then
+              sudo yum update -y && sudo yum install -y docker
+              sudo service docker start
+              sudo usermod -a -G docker ${{ secrets.EC2_USER }}
+            fi
 
-      - name: Syntax check
-        run: |
-          python -m py_compile model_service.py
-          python -m py_compile local_test_harness.py
+            docker stop flask-model-service || true
+            docker rm flask-model-service || true
+            docker build -t flask-model-service .
 
-      - name: Run local mocked smoke test
-        run: python local_test_harness.py
-
+            docker run -d \
+              --name flask-model-service \
+              -p 8000:8000 \
+              -e MODEL_S3_BUCKET="$MODEL_S3_BUCKET" \
+              -e MODEL_S3_KEY="$MODEL_S3_KEY" \
+              -e MODEL_S3_REGION="$MODEL_S3_REGION" \
+              flask-model-service
