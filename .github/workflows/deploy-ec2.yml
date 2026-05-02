@@ -30,9 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 black
 
+      # Black handles strict formatting (88 chars, trailing commas)
       - name: Run Black (Formatting Check)
         run: black --check .
 
+      # Flake8 handles code logic/style errors
       - name: Run Flake8 (Code Quality Check)
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -60,7 +62,7 @@ jobs:
 
       - name: Run tests
         run: |
-          # python -m ensures the current directory is in the PYTHONPATH
+          # Using python -m pytest ensures the current directory is added to sys.path
           python -m pytest tests/
 
   deploy:
@@ -100,9 +102,9 @@ jobs:
             set -e
             cd "$APP_DIR"
             
-            # Smart Docker Installation (Handles Ubuntu/Debian and Amazon Linux/RHEL)
+            # 1. Install Docker if missing (Checks for apt-get vs yum)
             if ! [ -x "$(command -v docker)" ]; then
-              echo "Docker not found, installing..."
+              echo "Installing Docker..."
               if [ -x "$(command -v apt-get)" ]; then
                 sudo apt-get update -y && sudo apt-get install -y docker.io
                 sudo systemctl start docker
@@ -112,14 +114,19 @@ jobs:
                 sudo service docker start
               fi
               sudo usermod -a -G docker ${{ secrets.EC2_USER }}
-              echo "Docker installed. Note: You may need to run 'sudo chmod 666 /var/run/docker.sock' manually once."
             fi
 
-            # Deployment Steps
+            # 2. Fix Docker Socket permissions for the current session
+            sudo chmod 777 /var/run/docker.sock
+
+            # 3. Clean up existing containers
             docker stop flask-model-service || true
             docker rm flask-model-service || true
-            docker build -t flask-model-service .
 
+            # 4. Build using buildx to avoid legacy builder deprecation
+            docker buildx build -t flask-model-service .
+
+            # 5. Run the container with S3 environment variables
             docker run -d \
               --name flask-model-service \
               -p 8000:8000 \
