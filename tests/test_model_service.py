@@ -110,7 +110,7 @@ class ModelServiceUnitTests(unittest.TestCase):
 
         result = model_service.run_prediction(features, model=model)
 
-        self.assertEqual(result["prediction"], [1])
+        self.assertEqual(result["prediction"], "Heart Disease Detected")
         self.assertEqual(result["probability"], [0.8])
         self.assertIsInstance(model.seen_features, pd.DataFrame)
 
@@ -119,7 +119,7 @@ class ModelServiceUnitTests(unittest.TestCase):
 
         result = model_service.run_prediction([[1, 2, 3]], model=model)
 
-        self.assertEqual(result, {"prediction": [0]})
+        self.assertEqual(result, {"prediction": "No Heart Disease Detected"})
 
 
 class FlaskRouteTests(unittest.TestCase):
@@ -151,7 +151,7 @@ class FlaskRouteTests(unittest.TestCase):
         self.assertIn("features", response.get_json()["error"])
 
     def test_predict_success(self):
-        expected = {"prediction": [1], "probability": [0.8]}
+        expected = {"prediction": "Heart Disease Detected", "probability": [0.8]}
         with patch("model_service.run_prediction", return_value=expected):
             response = self.app.post("/predict", json={"features": [[1, 2, 3]]})
 
