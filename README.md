@@ -81,3 +81,8 @@ Add repository secrets:
 
 Then trigger the workflow from Actions tab or push to `main`.
 
+## Unit tests
+
+```powershell
+python -m unittest discover -s tests -p "test_*.py"
+```

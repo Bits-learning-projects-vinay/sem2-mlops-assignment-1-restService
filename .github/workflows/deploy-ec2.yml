@@ -1,18 +1,78 @@
-name: Deploy Flask Model to EC2
+name: CI/CD Pipeline for Flask Model
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
+env:
+  # Early opt-in to Node.js 24 to ensure compatibility across all JS actions
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  deploy:
+  lint:
+    name: Lint Python Code
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        # Updated to v4 to avoid the Node.js deprecation warning
-        uses: actions/checkout@v4
+        # Updated to v6 to support Node 24 natively
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black
+
+      - name: Run Black (Formatting Check)
+        run: black --check .
+
+      - name: Run Flake8 (Code Quality Check)
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings (Max line length 88 to match Black)
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+  test:
+    name: Run Unit Tests
+    needs: lint # Only run tests if linting passes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: pytest tests/
+
+  deploy:
+    name: Deploy to EC2
+    needs: test # Only deploy if tests pass
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Copy files to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -21,12 +81,12 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_PORT }}
-          # List all files needed to build the Docker image
           source: "model_service.py,requirements.txt,Dockerfile"
           target: ${{ secrets.EC2_APP_DIR }}
 
       - name: Build and Run Docker Container on EC2
-        uses: appleboy/ssh-action@v1.0.3
+        # Updated to v1.2.4 for latest security and runtime support
+        uses: appleboy/ssh-action@v1.2.4
         env:
           MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
           MODEL_S3_KEY: ${{ secrets.MODEL_S3_KEY }}
@@ -42,22 +102,16 @@ jobs:
             set -e
             cd "$APP_DIR"
             
-            # Install Docker if it's not already on the EC2 (Optional check)
             if ! [ -x "$(command -v docker)" ]; then
               sudo yum update -y && sudo yum install -y docker
               sudo service docker start
               sudo usermod -a -G docker ${{ secrets.EC2_USER }}
             fi
 
-            # Stop and remove the old container if it exists
             docker stop flask-model-service || true
             docker rm flask-model-service || true
-
-            # Build the image from the Dockerfile we just copied
             docker build -t flask-model-service .
 
-            # Run the container
-            # -d runs it in background, -p maps Port 8000
             docker run -d \
               --name flask-model-service \
               -p 8000:8000 \
