@@ -1,7 +1,4 @@
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -91,33 +88,6 @@ class DataPreProcessingAndFeatureEngg:
         """Returns 0/1 target from raw data."""
         return self._clean_targets(self.targets_before_clean)
 
-    def run_visual_eda(self, X, y):
-        """Professional visualizations for assignment requirements."""
-        df = pd.concat([X, y], axis=1)
-        target_name = y.columns[0]
-
-        sns.set_theme(style="whitegrid")
-        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-
-        # 1. Class Balance
-        sns.countplot(data=df, x=target_name, ax=axes[0], palette="viridis")
-        axes[0].set_title("Target Distribution (0=Healthy, 1=Disease)")
-
-        # 2. Age Distribution
-        if "age" in df.columns:
-            sns.histplot(
-                data=df, x="age", hue=target_name, kde=True, ax=axes[1], element="step"
-            )
-            axes[1].set_title("Age Distribution by Risk")
-
-        # 3. Correlation
-        corr = df.corr(numeric_only=True)
-        sns.heatmap(corr, annot=False, cmap="RdBu_r", center=0, ax=axes[2])
-        axes[2].set_title("Feature Correlation Heatmap")
-
-        plt.tight_layout()
-        plt.show()
-
     def build_preprocessing_pipeline(self):
         """Creates an automated pipeline for numeric scaling and categorical encoding."""
         # Use simple presence checks to avoid errors if some columns are missing
@@ -178,4 +148,3 @@ if __name__ == "__main__":
     dp = DataPreProcessingAndFeatureEngg()
     X, y = dp.get_processed_data()
     print(f"Cleaned Data Shape: {X.shape}")
-    dp.run_visual_eda(X, y)
