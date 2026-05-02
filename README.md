@@ -1,120 +1,83 @@
-# AWS Lambda Model Loader
+# Flask Model Service (S3 PKL Loader)
 
-This project includes an AWS Lambda handler in `modelRestService.py` that reads a pickled model from an S3 bucket.
+This project runs a Flask API on EC2. It loads a pickled ML model from S3 and serves prediction requests.
+
+## Files
+
+- `model_service.py`: Flask app (`/health`, `/predict`) and S3 model loader
+- `local_test_harness.py`: local mock test without real AWS credentials
+- `.github/workflows/deploy-lambda.yml`: GitHub Actions workflow that deploys to EC2
+- `scripts/ec2_bootstrap.sh`: creates systemd service with Gunicorn on EC2
 
 ## Required environment variables
 
 - `MODEL_S3_BUCKET`: S3 bucket name
-- `MODEL_S3_KEY`: S3 object key for the `.pkl` model file
-- `MODEL_S3_REGION` (optional): AWS region for S3 client
+- `MODEL_S3_KEY`: S3 object key for your `.pkl` file
+- `MODEL_S3_REGION` (optional): defaults to your boto/AWS config
+- `PORT` (optional): defaults to `8000`
 
-## Lambda event format
-
-You can call the function with an empty event to just verify model loading:
-
-```json
-{}
-```
-
-If your model supports `.predict(...)`, pass features as a list of rows or a list of records.
-
-```json
-{
-  "features": [[5.1, 3.5, 1.4, 0.2]]
-}
-```
-
-Heart-disease record example (DataFrame-style input):
-
-```json
-{
-  "features": [
-    {
-      "age": 63,
-      "sex": 1,
-      "cp": 3,
-      "trestbps": 145,
-      "chol": 233,
-      "fbs": 1,
-      "restecg": 0,
-      "thalach": 150,
-      "exang": 0,
-      "oldpeak": 2.3,
-      "slope": 0,
-      "ca": 0,
-      "thal": "?"
-    }
-  ]
-}
-```
-
-## Local test (no AWS credentials required)
-
-`local_test_harness.py` mocks S3 and validates the Lambda handler end-to-end.
-
-```powershell
-python -m pip install -r requirements.txt
-python local_test_harness.py
-```
-
-## Deploy as AWS Lambda service
-
-### Prerequisites
-
-- AWS CLI configured (`aws configure`)
-- A Lambda execution role ARN with at least CloudWatch Logs + S3 read permissions
-- `MODEL_S3_BUCKET`, `MODEL_S3_KEY`, and `MODEL_S3_REGION` available in your shell (or `.env` loaded)
-
-### Deploy from local machine (PowerShell)
+## Run locally
 
 ```powershell
 python -m pip install -r requirements.txt
 $env:MODEL_S3_BUCKET="mlops-assignment1-vin"
 $env:MODEL_S3_KEY="model/heart_disease_logistic_regression_pipeline.pkl"
 $env:MODEL_S3_REGION="ap-south-1"
-.\scripts\deploy-lambda.ps1 -FunctionName "heart-disease-model-service" -Region "ap-south-1" -RoleArn "<your-lambda-role-arn>"
+python model_service.py
 ```
 
-If the function already exists, the script updates code. If it does not exist, the script creates it.
+Test endpoints:
 
-### Deploy from GitHub Actions
+```powershell
+curl http://127.0.0.1:8000/health
+curl -X POST http://127.0.0.1:8000/predict -H "Content-Type: application/json" -d '{"features":[{"age":63,"sex":1,"cp":3,"trestbps":145,"chol":233,"fbs":1,"restecg":0,"thalach":150,"exang":0,"oldpeak":2.3,"slope":0,"ca":0,"thal":"?"}]}'
+```
 
-Workflow file: `.github/workflows/deploy-lambda.yml`
+## Local mock test (no AWS creds)
 
-Add these repository secrets:
+```powershell
+python local_test_harness.py
+```
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION`
-- `LAMBDA_FUNCTION_NAME`
-- `LAMBDA_ROLE_ARN`
+## Deploy to EC2 manually
+
+1. Copy `model_service.py` and `requirements.txt` to EC2 (for example `/opt/model-service`).
+2. On EC2, set environment variables and run bootstrap script.
+
+```bash
+export APP_DIR=/opt/model-service
+export APP_USER=ubuntu
+export MODEL_S3_BUCKET=mlops-assignment1-vin
+export MODEL_S3_KEY=model/heart_disease_logistic_regression_pipeline.pkl
+export MODEL_S3_REGION=ap-south-1
+bash scripts/ec2_bootstrap.sh
+```
+
+The service is started as `model-service` and bound to `0.0.0.0:8000`.
+
+### Deploy from Windows (PowerShell)
+
+```powershell
+$env:MODEL_S3_BUCKET="mlops-assignment1-vin"
+$env:MODEL_S3_KEY="model/heart_disease_logistic_regression_pipeline.pkl"
+$env:MODEL_S3_REGION="ap-south-1"
+.\scripts\deploy-ec2.ps1 -Ec2Host "<ec2-public-ip-or-dns>" -Ec2User "ubuntu" -SshKeyPath "C:\path\to\key.pem"
+```
+
+## Deploy to EC2 with GitHub Actions
+
+Workflow: `.github/workflows/deploy-lambda.yml` (renamed behavior: EC2 deploy)
+
+Add repository secrets:
+
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+- `EC2_PORT` (for example `22`)
+- `EC2_APP_DIR` (for example `/opt/model-service`)
 - `MODEL_S3_BUCKET`
 - `MODEL_S3_KEY`
 - `MODEL_S3_REGION`
 
-Then trigger **Deploy Lambda** from the Actions tab or push to `main`.
-
-### Invoke test event
-
-```json
-{
-  "features": [
-    {
-      "age": 63,
-      "sex": 1,
-      "cp": 3,
-      "trestbps": 145,
-      "chol": 233,
-      "fbs": 1,
-      "restecg": 0,
-      "thalach": 150,
-      "exang": 0,
-      "oldpeak": 2.3,
-      "slope": 0,
-      "ca": 0,
-      "thal": "?"
-    }
-  ]
-}
-```
+Then trigger the workflow from Actions tab or push to `main`.
 
