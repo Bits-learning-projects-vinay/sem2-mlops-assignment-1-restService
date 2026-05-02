@@ -75,7 +75,9 @@ def run_prediction(features, model=None):
     normalized = normalize_features(features)
 
     prediction = active_model.predict(normalized)
-    result = "Heart Disease Detected" if prediction[0] == 1 else "No Heart Disease Detected"
+    result = (
+        "Heart Disease Detected" if prediction[0] == 1 else "No Heart Disease Detected"
+    )
     body = {"prediction": result}
 
     if hasattr(active_model, "predict_proba"):
