@@ -30,11 +30,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 black
 
-      # Black handles strict formatting (88 chars, trailing commas)
       - name: Run Black (Formatting Check)
         run: black --check .
 
-      # Flake8 handles code logic/style errors
       - name: Run Flake8 (Code Quality Check)
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -62,7 +60,6 @@ jobs:
 
       - name: Run tests
         run: |
-          # Using python -m pytest ensures the current directory is added to sys.path
           python -m pytest tests/
 
   deploy:
@@ -102,9 +99,8 @@ jobs:
             set -e
             cd "$APP_DIR"
             
-            # 1. Install Docker if missing (Checks for apt-get vs yum)
+            # 1. Install Docker if missing
             if ! [ -x "$(command -v docker)" ]; then
-              echo "Installing Docker..."
               if [ -x "$(command -v apt-get)" ]; then
                 sudo apt-get update -y && sudo apt-get install -y docker.io
                 sudo systemctl start docker
@@ -116,17 +112,18 @@ jobs:
               sudo usermod -a -G docker ${{ secrets.EC2_USER }}
             fi
 
-            # 2. Fix Docker Socket permissions for the current session
+            # 2. Fix permissions
             sudo chmod 777 /var/run/docker.sock
 
-            # 3. Clean up existing containers
-            docker stop flask-model-service || true
-            docker rm flask-model-service || true
+            # 3. Stop and remove existing container if it exists
+            # We use '2>/dev/null' to hide the error if the container doesn't exist
+            docker stop flask-model-service 2>/dev/null || true
+            docker rm flask-model-service 2>/dev/null || true
 
-            # 4. Build using buildx to avoid legacy builder deprecation
-            docker buildx build -t flask-model-service .
+            # 4. Build using the standard build command for maximum compatibility
+            docker build -t flask-model-service .
 
-            # 5. Run the container with S3 environment variables
+            # 5. Run the container
             docker run -d \
               --name flask-model-service \
               -p 8000:8000 \
