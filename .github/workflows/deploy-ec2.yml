@@ -1,47 +1,67 @@
-name: Deploy ML Model to AWS Lambda
+name: Deploy Flask Model to EC2
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Check out repository
+        # Updated to v4 to avoid the Node.js deprecation warning
+        uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # Change to your region
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          # List all files needed to build the Docker image
+          source: "model_service.py,requirements.txt,Dockerfile"
+          target: ${{ secrets.EC2_APP_DIR }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
-      - name: Build, Tag, and Push Image to ECR
+      - name: Build and Run Docker Container on EC2
+        uses: appleboy/ssh-action@v1.0.3
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: mlops-lambda-repo
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          # Build the container
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          # Push to AWS
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          # Also tag as latest for easy reference
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          MODEL_S3_BUCKET: ${{ secrets.MODEL_S3_BUCKET }}
+          MODEL_S3_KEY: ${{ secrets.MODEL_S3_KEY }}
+          MODEL_S3_REGION: ${{ secrets.MODEL_S3_REGION }}
+          APP_DIR: ${{ secrets.EC2_APP_DIR }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_PORT }}
+          envs: MODEL_S3_BUCKET,MODEL_S3_KEY,MODEL_S3_REGION,APP_DIR
+          script: |
+            set -e
+            cd "$APP_DIR"
+            
+            # Install Docker if it's not already on the EC2 (Optional check)
+            if ! [ -x "$(command -v docker)" ]; then
+              sudo yum update -y && sudo yum install -y docker
+              sudo service docker start
+              sudo usermod -a -G docker ${{ secrets.EC2_USER }}
+            fi
 
-      - name: Update Lambda Function Code
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: mlops-lambda-repo
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          aws lambda update-function-code \
-            --function-name YourLambdaFunctionName \
-            --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            # Stop and remove the old container if it exists
+            docker stop flask-model-service || true
+            docker rm flask-model-service || true
+
+            # Build the image from the Dockerfile we just copied
+            docker build -t flask-model-service .
+
+            # Run the container
+            # -d runs it in background, -p maps Port 8000
+            docker run -d \
+              --name flask-model-service \
+              -p 8000:8000 \
+              -e MODEL_S3_BUCKET="$MODEL_S3_BUCKET" \
+              -e MODEL_S3_KEY="$MODEL_S3_KEY" \
+              -e MODEL_S3_REGION="$MODEL_S3_REGION" \
+              flask-model-service
