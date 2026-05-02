@@ -27,6 +27,4 @@ ENV PORT=8000
 ENV MODEL_S3_REGION=ap-south-1
 
 # Command to run the application using Gunicorn (recommended for production)
-# If you haven't added gunicorn to requirements.txt, you can use:
-# CMD ["python", "model_service.py"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "model_service:app"]
