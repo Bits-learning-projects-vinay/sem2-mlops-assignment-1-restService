@@ -11,8 +11,7 @@ from prometheus_flask_exporter import PrometheusMetrics  # Added for monitoring 
 # 1. Configure Logging
 # Using INFO level to capture predictions and request statuses in Docker logs
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,9 @@ def get_model(s3_client=None):
     region = os.environ.get("MODEL_S3_REGION")
 
     if not bucket or not key:
-        logger.error("Environment variables MODEL_S3_BUCKET and MODEL_S3_KEY are missing.")
+        logger.error(
+            "Environment variables MODEL_S3_BUCKET and MODEL_S3_KEY are missing."
+        )
         raise ValueError(
             "Environment variables MODEL_S3_BUCKET and MODEL_S3_KEY are required."
         )
@@ -111,12 +112,14 @@ def create_app():
 
     # Use an app-local registry so repeated app factory calls do not clash in tests.
     metrics = PrometheusMetrics(app, registry=CollectorRegistry())
-    metrics.info('app_info', 'Model Service Info', version='1.0.0')
+    metrics.info("app_info", "Model Service Info", version="1.0.0")
 
     # 3. Global Request Logging
     @app.before_request
     def log_request_info():
-        logger.info(f"Incoming: {request.method} {request.path} from {request.remote_addr}")
+        logger.info(
+            f"Incoming: {request.method} {request.path} from {request.remote_addr}"
+        )
 
     @app.after_request
     def log_response_info(response):
