@@ -126,6 +126,13 @@ class FlaskRouteTests(unittest.TestCase):
     def setUp(self):
         self.app = model_service.create_app().test_client()
 
+    def test_create_app_multiple_times_does_not_raise(self):
+        first = model_service.create_app()
+        second = model_service.create_app()
+
+        self.assertIsNotNone(first)
+        self.assertIsNotNone(second)
+
     def test_health_success(self):
         with patch("model_service.get_model", return_value=DummyModelWithProba()):
             response = self.app.get("/health")
