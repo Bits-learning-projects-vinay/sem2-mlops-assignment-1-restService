@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 15s  # How frequently to poll the Flask app for data
+
+scrape_configs:
+  - job_name: 'flask-model-service'
+    static_configs:
+      # We use the EC2's Private IP to ensure the internal Docker network connection
+      - targets: ['172.31.44.18:8000']
