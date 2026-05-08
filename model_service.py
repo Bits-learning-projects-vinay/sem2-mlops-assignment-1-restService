@@ -103,6 +103,19 @@ def run_prediction(features, model=None):
         body["probability"] = _to_json_safe(probability)
         logger.info(f"Model Probability: {body['probability']}")
 
+        positive_probability = body["probability"]
+        if isinstance(positive_probability, list):
+            positive_probability = (
+                positive_probability[0] if positive_probability else None
+            )
+
+        if positive_probability is not None:
+            confidence_score = float(positive_probability)
+            if int(prediction[0]) != 1:
+                confidence_score = 1 - confidence_score
+            body["confidence"] = f"{confidence_score * 100:.2f}%"
+            logger.info(f"Model Confidence: {body['confidence']}")
+
     return body
 
 
